@@ -40,7 +40,7 @@ cp model.env.example model.env
 
 Setelah itu isi nilainya sesuai environment.
 
-### 3. Jalankan Docker
+### 3. Jalankan Docker untuk s3, postgres, model, dan api/admin/client(bisa via docker/npm)
 
 Jalankan secara berurutan:
 
