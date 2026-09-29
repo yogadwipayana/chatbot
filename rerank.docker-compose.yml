@@ -1,0 +1,49 @@
+services:
+  gte:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    container_name: gte-reranker
+    restart: always
+    ports:
+      - "8081:80"
+    volumes:
+      - gte-data:/data
+    environment:
+      MODEL_ID: Alibaba-NLP/gte-multilingual-reranker-base
+      SERVED_MODEL_NAME: gte-multilingual-reranker-base
+      DTYPE: float32
+      # API authentication
+      API_KEY: ${GTE_API_KEY}
+      # TEI internal port
+      PORT: "80"
+    networks:
+      - rerank-network
+
+  bge:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    container_name: bge-reranker
+    restart: always
+    ports:
+      - "8082:80"
+    volumes:
+      - bge-data:/data
+    environment:
+      MODEL_ID: BAAI/bge-reranker-v2-m3
+      SERVED_MODEL_NAME: bge-reranker-v2-m3
+      DTYPE: float32
+      # API authentication
+      API_KEY: ${BGE_API_KEY}
+      # TEI internal port
+      PORT: "80"
+    networks:
+      - rerank-network
+
+volumes:
+  gte-data:
+    name: gte-data
+  bge-data:
+    name: bge-data
+
+networks:
+  rerank-network:
+    name: rerank-network
+    driver: bridge
