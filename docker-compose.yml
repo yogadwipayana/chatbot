@@ -1,0 +1,62 @@
+# Menjalankan api + admin + client:
+#   docker compose up -d --build
+#
+# Konfigurasi api dibaca dari api/.env. PostgreSQL + pgvector TIDAK ada di
+# compose ini: api memakai Postgres yang sudah terpasang di host pada
+# localhost:5432. Karena itu api memakai network_mode: host, sehingga
+# "localhost" di DATABASE_URL tetap berarti host dan api/.env tidak perlu diubah.
+
+services:
+  api:
+    build:
+      context: ./api
+      args:
+        INSTALL_LOCAL_MODELS: ${INSTALL_LOCAL_MODELS:-false}
+    image: chatbot-api
+    restart: unless-stopped
+    # Jaringan host: api langsung listen di port 8000 host (tanpa mapping
+    # `ports`) dan bisa mencapai Postgres di localhost:5432.
+    network_mode: host
+    env_file:
+      - ./api/.env
+    environment:
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    volumes:
+      - api-log:/app/log
+
+  admin:
+    build:
+      context: ./admin
+      args:
+        # Alamat API dari sudut pandang PERAMBAN, ditanam saat build.
+        # Kosong = pakai NEXT_PUBLIC_API_BASE_URL dari admin/.env.
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+    image: chatbot-admin
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3000}:3000"
+    depends_on:
+      - api
+
+  client:
+    build:
+      context: ./client
+      args:
+        # Kosong = pakai nilai dari client/.env.
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+    image: chatbot-client
+    restart: unless-stopped
+    environment:
+      # Alamat api dari dalam kontainer ini, untuk memeriksa kunci sematan
+      # (client/src/proxy.ts). api memakai jaringan host, jadi "localhost" di
+      # sini bukan api -- host dicapai lewat host.docker.internal.
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://host.docker.internal:8000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${CLIENT_PORT:-3001}:3001"
+    depends_on:
+      - api
+
+volumes:
+  api-log:

@@ -1,0 +1,60 @@
+# MinIO 2025.4.22 â€” S3-compatible object storage
+#
+# Kenapa image bitnamilegacy, bukan minio/minio resmi:
+# MinIO menutup distribusi publiknya. Docker Hub minio/minio -> 404,
+# quay.io/minio/minio -> butuh login, dl.min.io -> 410 Gone.
+# bitnamilegacy/minio:2025.4.22 berisi rilis RELEASE.2025-04-22T22-12-26Z,
+# yaitu rilis terakhir yang masih punya web console lengkap.
+# Baca README.md, terutama bagian Keamanan.
+
+services:
+  minio:
+    image: bitnamilegacy/minio:2025.4.22-debian-12-r2
+    container_name: minio
+    restart: unless-stopped
+    # Tanpa `command:` â€” entrypoint Bitnami yang menjalankan server
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Bucket dibuat otomatis saat start. Format "nama:policy"
+      MINIO_DEFAULT_BUCKETS: ${S3_BUCKET}:none
+      MINIO_SCHEME: http
+      # Dipakai console untuk menyusun presigned URL
+      MINIO_SERVER_URL: ${MINIO_SERVER_URL}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_CONSOLE_URL}
+    ports:
+      - "9000:9000"    # S3 API â€” dipakai aplikasi & SDK
+      - "9001:9001"    # Web console
+    volumes:
+      - minio-data:/bitnami/minio/data      # path Bitnami, bukan /data
+    healthcheck:
+      test: ["CMD-SHELL", "mc --config-dir /tmp/.mc alias set hc http://127.0.0.1:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" >/dev/null 2>&1 && mc --config-dir /tmp/.mc ready hc"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # Sekali jalan: buat bucket + user aplikasi, lalu berhenti sendiri
+  init:
+    image: bitnamilegacy/minio-client:2025.4.16-debian-12-r2
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET}
+      APP_ACCESS_KEY: ${APP_ACCESS_KEY}
+      APP_SECRET_KEY: ${APP_SECRET_KEY}
+    entrypoint: >
+      /bin/sh -c "
+      mc --config-dir /tmp/.mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+      mc --config-dir /tmp/.mc mb --ignore-existing local/$$S3_BUCKET &&
+      mc --config-dir /tmp/.mc admin user add local $$APP_ACCESS_KEY $$APP_SECRET_KEY || true;
+      mc --config-dir /tmp/.mc admin policy attach local readwrite --user $$APP_ACCESS_KEY || true;
+      echo 'bucket dan user aplikasi siap'
+      "
+    restart: "no"
+
+volumes:
+  minio-data:

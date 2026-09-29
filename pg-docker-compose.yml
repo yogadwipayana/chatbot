@@ -1,0 +1,45 @@
+# Postgres (pgvector) + pgweb
+# Kedua service dipublikasikan ke semua interface agar bisa diakses dari luar host.
+# Baca README.md sebelum dipakai di jaringan publik.
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.6-pg16   # dipatok: pgvector 0.8.6 + Postgres 16
+    container_name: pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # File .sql/.sh di sini jalan otomatis saat volume masih kosong (opsional)
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    shm_size: 256mb
+
+  pgweb:
+    image: sosedoff/pgweb:latest
+    container_name: pgweb
+    restart: unless-stopped
+    environment:
+      # "db" = nama service di atas, lewat jaringan internal docker
+      PGWEB_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      PGWEB_AUTH_USER: ${PGWEB_AUTH_USER}
+      PGWEB_AUTH_PASS: ${PGWEB_AUTH_PASS}
+    ports:
+      - "5050:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -1,0 +1,6 @@
+ssh -N -L 5432:127.0.0.1:5432 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes embed@100.111.178.48
+
+cd api/;.venv\Scripts\activate;uvicorn app.main:app --reload
+
+cd admin/; npm run dev
+cd client/; npm run dev
