@@ -15,6 +15,12 @@ services:
       API_KEY: ${GTE_API_KEY}
       # TEI internal port
       PORT: "80"
+      # Warmup memakai batch sebesar ini; bawaan 16384 butuh >9 GB RAM di CPU.
+      # Input yang lebih panjang dipotong (AUTO_TRUNCATE bawaan true).
+      MAX_BATCH_TOKENS: "2048"
+    # Kehabisan memori mematikan container ini saja, bukan seluruh server.
+    mem_limit: 3g
+    memswap_limit: 3g
     networks:
       - rerank-network
 
@@ -34,6 +40,12 @@ services:
       API_KEY: ${BGE_API_KEY}
       # TEI internal port
       PORT: "80"
+      # Warmup memakai batch sebesar ini; bawaan 16384 butuh >9 GB RAM di CPU.
+      # Input yang lebih panjang dipotong (AUTO_TRUNCATE bawaan true).
+      MAX_BATCH_TOKENS: "2048"
+    # Kehabisan memori mematikan container ini saja, bukan seluruh server.
+    mem_limit: 6g
+    memswap_limit: 6g
     networks:
       - rerank-network
 
