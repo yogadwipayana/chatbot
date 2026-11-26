@@ -1,0 +1,13 @@
+# Repository ini PUBLIC: hanya .env.example yang boleh di-commit.
+.env
+.env.*
+!.env.example
+*.bak-*
+
+# Kode aplikasi = repository terpisah, di-clone ke chatbot/ (lihat README).
+chatbot/api/
+chatbot/admin/
+chatbot/client/
+
+# Checkpoint Laya (~650 MB per folder); simpan di luar git.
+laya/models/

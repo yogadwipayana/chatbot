@@ -1,0 +1,60 @@
+services:
+  9router:
+    image: decolua/9router:latest
+    container_name: 9router
+    restart: always
+    ports:
+      - "20128:20128"
+    volumes:
+      - 9router-data:/app/data
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+      PORT: "20128"
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+      HEADROOM_URL: http://headroom:8787
+    depends_on:
+      - headroom
+    networks:
+      - pandu-network
+
+  headroom:
+    image: ghcr.io/chopratejas/headroom:latest
+    container_name: headroom
+    restart: always
+    ports:
+      - "8787:8787"
+    networks:
+      - pandu-network
+
+  e5:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    container_name: e5-embedding
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - e5-data:/data
+    environment:
+      MODEL_ID: intfloat/multilingual-e5-small
+      SERVED_MODEL_NAME: multilingual-e5-small
+      DTYPE: float32
+      # API authentication
+      API_KEY: ${E5_API_KEY}
+      # TEI internal port
+      PORT: "80"
+    networks:
+      - pandu-network
+
+volumes:
+  9router-data:
+    name: 9router-data
+  e5-data:
+    name: e5-data
+
+networks:
+  pandu-network:
+    name: pandu-network
+    driver: bridge

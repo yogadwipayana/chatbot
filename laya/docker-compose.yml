@@ -1,0 +1,72 @@
+# Laya (checkpoint laya-multilingual) sebagai server keputusan yang kompatibel
+# dengan JEV: POST /v1/systemone. Baca README.md sebelum menjalankan.
+# Berdiri sendiri: jaringan, volume, dan image milik project ini sendiri, tidak
+# bergantung pada compose lain (/9router, /chatbot).
+name: laya
+
+services:
+  laya:
+    # Tidak ada image resmi di registry; build dari Dockerfile repo upstream
+    # (python:3.11-slim, torch CPU, user non-root 10001).
+    build:
+      context: https://github.com/NandhaKishorM/laya.git#${LAYA_GIT_REF:-v0.3.22}
+      args:
+        TORCH_INDEX: cpu
+        TORCH_VERSION: "2.14.0"
+    image: laya-serve:local
+    container_name: laya-decision
+    # Mengganti CMD quickstart bawaan image; ENTRYPOINT image tetap jalan dulu
+    command: ["python", "/opt/pandu/sajikan_laya.py"]
+    restart: always
+    init: true
+    ports:
+      # :8000 di host dipakai chatbot-api (network_mode: host).
+      # Semua antarmuka, seperti e5 di /9router (2026-10-05, permintaan user):
+      # bisa diakses lewat Tailscale/LAN; LAYA_API_KEY wajib di setiap request.
+      - "${LAYA_HOST_PORT:-8001}:8000"
+    volumes:
+      - laya-data:/home/laya/.cache/huggingface
+      - /laya/models/laya-pandu-gerbang:/models/laya-pandu-gerbang:ro
+      - /laya/sajikan_laya.py:/opt/pandu/sajikan_laya.py:ro
+    environment:
+      LAYA_PANDU_PATH: /models/laya-pandu-gerbang
+      MKL_CBWR: COMPATIBLE
+      LAYA_HOST: "0.0.0.0"
+      LAYA_PORT: "8000"
+      LAYA_DEVICE: cpu
+      # Hanya checkpoint multilingual (mmBERT-base 322M) yang dimuat saat start
+      LAYA_PRELOAD: "1"
+      LAYA_MODELS: multilingual
+      LAYA_MAX_LOADED: "1"
+      LAYA_AUTO_TASK: "0"
+      # Kosong = float32. Jangan isi bf16: CPU host tanpa AVX tidak punya bf16 native
+      LAYA_CPU_AMP: ""
+      LAYA_THREADS: "${LAYA_THREADS:-4}"
+      OMP_NUM_THREADS: "${LAYA_THREADS:-4}"
+      LAYA_LOG_LEVEL: info
+      # API authentication (wajib)
+      LAYA_API_KEY: "${LAYA_API_KEY:?isi LAYA_API_KEY di /laya/.env}"
+      # "1" setelah bobot terunduh supaya restart tidak menghubungi HF Hub
+      HF_HUB_OFFLINE: "${HF_HUB_OFFLINE:-0}"
+    # Batas agar OOM tidak menjalar ke pg/9router/chatbot-api
+    cpus: "${LAYA_CPUS:-4}"
+    mem_limit: "${LAYA_MEM_LIMIT:-3g}"
+    memswap_limit: "${LAYA_MEM_LIMIT:-3g}"
+    healthcheck:
+      # /health baru menjawab setelah checkpoint selesai dimuat
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+    networks:
+      - laya-network
+
+volumes:
+  laya-data:
+    name: laya-data
+
+networks:
+  laya-network:
+    name: laya-network
+    driver: bridge

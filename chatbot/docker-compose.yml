@@ -44,15 +44,12 @@ services:
       args:
         # Kosong = pakai nilai dari client/.env.
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+        EMBED_ALLOWED_ORIGINS: ${EMBED_ALLOWED_ORIGINS:-}
     image: chatbot-client
+    # CLIENT_PASSWORD dan API_INTERNAL_URL dibaca saat berjalan; image
+    # tidak membawa client/.env ke tahap runtime.
+    env_file: ./client/.env
     restart: unless-stopped
-    environment:
-      # Alamat api dari dalam kontainer ini, untuk memeriksa kunci sematan
-      # (client/src/proxy.ts). api memakai jaringan host, jadi "localhost" di
-      # sini bukan api -- host dicapai lewat host.docker.internal.
-      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://host.docker.internal:8000}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "${CLIENT_PORT:-3001}:3001"
     depends_on:
